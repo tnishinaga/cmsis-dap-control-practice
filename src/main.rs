@@ -67,9 +67,8 @@ impl CmsisDapInterface {
         buf[..length].to_vec()
     }
 
-    pub fn info(&self) {
-        // get product name
-        self.write(&[CmsisDapCommandId::Info as u8, 0x02]);
+    pub fn info(&self, id: u8) {
+        self.write(&[CmsisDapCommandId::Info as u8, id]);
         let buf = self.read();
         println!("{:x?}", buf);
     }
@@ -95,19 +94,72 @@ impl CmsisDapInterface {
         println!("{:x}", response[1]);
     }
 
-    pub fn 
+    pub fn swj_sequence(&self, sequence_bit_count: u8, sequence_bit_data: &[u8]) {
+        let mut commands = vec![CmsisDapCommandId::SWJSequence as u8, sequence_bit_count];
+        commands.extend_from_slice(sequence_bit_data);
+        self.write(&commands);
+        let response = self.read();
+        println!("{:x?}", response);
+    }
+
+    pub fn jtag_sequence(&self, sequence: &Vec<(u8, &[u8])>) {
+        let sequence_count: u8 = sequence.len().try_into().unwrap();
+        let mut commands = vec![CmsisDapCommandId::JTAGSequence as u8, sequence_count];
+
+        for s in sequence {
+            commands.push(s.0);
+            commands.extend_from_slice(s.1);
+        }
+        self.write(&commands);
+        let response = self.read();
+        println!("{:x?}", response);
+    }
+}
+
+fn jtag_reset(dap: &CmsisDapInterface) {
+    let tdi = [0xff; 8];
+    let sequence: Vec<(u8, &[u8])> = vec![(
+        1 << 6, // 64bit, tms high
+        &tdi,
+    )];
+    dap.jtag_sequence(&sequence);
+}
+
+fn move_to_shift_dr(dap: &CmsisDapInterface) {
+    let tms_sequence = [0, 1, 0, 0];
+    for tms in tms_sequence {
+        let sequence: Vec<(u8, &[u8])> = vec![(
+            1 | tms << 6, // 1bit, tms low
+            &[0xff],
+        )];
+        dap.jtag_sequence(&sequence);
+    }
 }
 
 fn main() {
     let dap = CmsisDapInterface::new(0x6666, 0x4444);
     // dap info
-    // dap.info();
-    dap.connect();
+    dap.info(0xf0);
+
+    // dap.connect();
     // loop {
     //     let pin = SWJPins::N_RESET;
     //     dap.swj_pins(pin, pin, 0);
     //     thread::sleep(time::Duration::from_secs(1));
     //     dap.swj_pins(SWJPins::empty(), pin, 0);
+    //     thread::sleep(time::Duration::from_secs(1));
+    // }
+
+    // jtag_reset(&dap);
+    // move_to_shift_dr(&dap);
+
+    // loop {
+    //     let tdi = [1, 2, 3, 4, 5, 6, 7, 8];
+    //     let sequence: Vec<(u8, &[u8])> = vec![(
+    //         1 << 7, // 64bit, tms high, with tdo capture
+    //         &tdi,
+    //     )];
+    //     dap.jtag_sequence(&sequence);
     //     thread::sleep(time::Duration::from_secs(1));
     // }
 }

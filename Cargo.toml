@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 rusb = "0.9.1"
 bitflags = "1.3.2"
+
+[[bin]]
+name = "minimal_example"
+path = "src/minimal_example.rs"
